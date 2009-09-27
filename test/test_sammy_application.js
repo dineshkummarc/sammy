@@ -632,7 +632,7 @@
         });
       })
       .should('not override the global EventContext prototype methods', function() {
-        matches(/swap\(/, new Sammy.EventContext().partial.toString());
+        matches(/var\s+file_data,\s*wrapped_callback,\s*engine/, new Sammy.EventContext().partial.toString());
       })
       .should('yield additional arguments as arguments to the plugin', function() {
         equals(this.app.a, 1);
