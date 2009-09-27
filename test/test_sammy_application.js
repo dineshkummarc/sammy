@@ -178,6 +178,7 @@
           
             this.route('post', /test/, function() {
               this.app.form_was_run = 'YES';
+              this.app.form_params = this.params;
               return false;
             });
           
@@ -207,12 +208,22 @@
       .should('bind events to all forms', function() {
         var app = this.app;
         app.run('#/');
-        // $('form').submit();
-        // matches(/sammy-app/, $('form')[0].className);
-        // soon(function() {
-        //   equals(app.form_was_run, 'YES');
-        //   app.unload();
-        // }, this, 1, 2);
+        $('form').submit();
+        matches(/sammy-app/, $('form')[0].className);
+        soon(function() {
+          equals(app.form_was_run, 'YES');
+          app.unload();
+        }, this, 1, 2);
+      })
+      .should('parse params for forms', function() {
+        var app = this.app;
+        app.run('#/');
+        $('form').submit();
+        soon(function() {
+          ok(app.form_params);
+          isObj(app.form_params['check[]'], ['TEST 1', 'TEST 2']);
+          app.unload();
+        }, this, 1, 2);
       })
       .should('trigger routes on URL change', function() {
         var app = this.app;
@@ -579,13 +590,13 @@
               alert: function(message) {
                 this.$element().append(message);
               },
-              template: function(template, data) {
-                return "MY USELESS TEMPLATE";
+              partial: function(template, data) {
+                return "MY USELESS PARTIAL";
               }
             });
             
             this.get('#/login', function(e) {
-              e.alert(e.template("Please Login"));
+              e.alert(e.partial("Please Login"));
             });
           };
           
@@ -616,12 +627,12 @@
         window.location.hash = "";
         app.run('#/login');
         soon(function() {
-          equals($('.get_area').text(), 'MY USELESS TEMPLATE');
+          equals($('.get_area').text(), 'MY USELESS PARTIAL');
           app.unload();
         });
       })
       .should('not override the global EventContext prototype methods', function() {
-        matches(/\$\.srender/, new Sammy.EventContext().template.toString());
+        matches(/swap\(/, new Sammy.EventContext().partial.toString());
       })
       .should('yield additional arguments as arguments to the plugin', function() {
         equals(this.app.a, 1);
