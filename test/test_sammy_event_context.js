@@ -1,9 +1,16 @@
 (function($) {
+
     with(jqUnit) {
       var test_app = new Sammy.Application(function() {
         this.silence_404 = true;
         this.element_selector = '#main';
+        this.use(Sammy.Ejs);
       });
+      var nocontext = function() {
+        var x = {};
+        x.should = function() { return x; };
+        return x;
+      };
       var test_context = new Sammy.EventContext(test_app, 'get', '#/test/:test', {test: 'hooray'});
 
       context('Sammy', 'EventContext','init', {
@@ -62,7 +69,7 @@
         });
       });
       
-      context('Sammy', 'EventContext', 'partial', {
+      context('Sammy', 'EventContext', 'Template', 'partial', {
         before: function() {
           this.app     = test_app;
           this.context = test_context;
@@ -146,6 +153,100 @@
         });
         test_app.run();
         this.context.partial('fixtures/partial.html', function(data) { 
+          changed = false;
+        });
+        soon(function() {
+          ok(changed);
+          test_app.unload();
+        });
+      });      
+      
+      context('Sammy', 'EventContext', 'Ejs', 'partial', {
+        before: function() {
+          this.app     = test_app;
+          this.context = test_context;
+        }
+      })
+      .should('not run through ejs if Sammy.Ejs is not present', function() {
+        var contents = '';
+        var app = new Sammy.Application(function() { this.element_selector = '#main'; });
+        var context = new app.context_prototype(app);
+        context.partial('fixtures/partial.ejs', {name: 'TEMPLATE!', class_name: 'test_template'}, function(data) { 
+          contents = data; 
+        });
+        soon(function () {
+          equals(contents, '<div class="<%= class_name %>"><%= name %></div>' + "\n");
+        });
+      })
+      .should('run through ejs if Sammy.Ejs _is_ present', function() {
+        var contents = '';
+        var app = this.app;
+        this.context = new this.app.context_prototype(app);
+        this.context.partial('fixtures/partial.ejs', {name: 'TEMPLATE!', class_name: 'test_template'}, function(data) { 
+          contents = data; 
+        });
+        soon(function () {
+          equals(contents, '<div class="test_template">TEMPLATE!</div> ');
+        });
+      })
+      .should('cache template if cache() is present', function() {
+        var contents = '';
+        var app = new Sammy.Application(function() { this.element_selector = '#main'; });
+        app.use(Sammy.Ejs);
+        app.use(Sammy.Cache);
+        this.context = new app.context_prototype(app);
+        this.context.partial('fixtures/partial.ejs', {name: 'TEMPLATE!', class_name: 'test_template'}, function(data) { 
+          contents = data; 
+        });
+        soon(function () {
+          equals(contents, '<div class="test_template">TEMPLATE!</div> ');
+          equals((new Function('obj', app.cache('ejs:fixtures/partial.ejs')))({name: 'TEXT', class_name: 'klass'}), '<div class="klass">TEXT</div> ');
+          this.context.partial('fixtures/partial.ejs', {name: 'TEMPLATE!', class_name: 'test_template'}, function(data) { 
+            contents = data;
+          });
+          equals(contents, '<div class="test_template">TEMPLATE!</div> ');
+        }, this, 1, 3);
+      })
+      .should('not cache template if cache is present and cache_partials: false', function() {
+        var contents = '';
+        var app = new Sammy.Application(function() { this.element_selector = '#main'; });
+        app.use(Sammy.Ejs);
+        app.use(Sammy.Cache);
+        app.cache_partials = false;
+        this.context = new app.context_prototype(app);
+        this.context.partial('fixtures/partial.ejs', {name: 'TEMPLATE!', class_name: 'test_template'}, function(data) {
+          contents = data;
+        });
+        soon(function () {
+          equals(contents, '<div class="test_template">TEMPLATE!</div> ');
+          ok(!app.cache('ejs:fixtures/partial.ejs'));
+        }, this, 1, 2);
+      })
+      .should('replace default app element if no callback is passed', function() {
+        var contents = '';
+        var app = this.app;
+        this.context = new app.context_prototype(app);
+        this.context.partial('fixtures/partial.ejs', {name: 'TEMPLATE!', class_name: 'test_template'});
+        soon(function () {
+          equals(test_app.$element().html(), '<div class="test_template">TEMPLATE!</div> ');
+        });
+      })
+      .should('render the partial within the partial', function() {
+        var contents = '';
+        var app = this.app;
+        this.context = new app.context_prototype(app);
+        this.context.partial('fixtures/partial2.ejs', {name: 'TEMPLATE!', class_name: 'test_template'});
+        soon(function () {
+          equals(test_app.$element().html(), '<div class="test_template">Inline <div class="inline_partial">TEMPLATE!</div> </div> ');
+        });
+      })
+      .should('trigger changed after the partial callback', function() {
+        var changed = false;
+        test_app.bind('changed', function() {
+          changed = true;
+        });
+        test_app.run();
+        this.context.partial('fixtures/partial.ejs', function(data) { 
           changed = false;
         });
         soon(function() {
